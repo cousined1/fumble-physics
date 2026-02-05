@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Fumble Physics | Super Bowl LX Edition</title>
+    <meta name="description" content="Can you survive the Super Bowl fumble chaos? Catch footballs before they bounce out in this physics-defying game!">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --chiefs-red: #E31837;
+            --chiefs-gold: #FFB81C;
+            --eagles-green: #004C54;
+            --eagles-silver: #A5ACAF;
+            --white: #FFFFFF;
+            --gold: #FFD700;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #1a472a;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* HUD */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            display: none;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .score-panel {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 16px 24px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .score-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 4px;
+        }
+
+        .score-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--white);
+            line-height: 1;
+        }
+
+        .combo-display {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Oswald', sans-serif;
+            font-size: 72px;
+            font-weight: 700;
+            color: var(--gold);
+            text-shadow: 0 0 40px rgba(255, 215, 0, 0.8);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .combo-display.active {
+            opacity: 1;
+            animation: comboPop 0.5s ease-out;
+        }
+
+        @keyframes comboPop {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .gravity-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 12px 24px;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .gravity-arrow {
+            font-size: 24px;
+            transition: transform 0.3s ease;
+        }
+
+        .gravity-arrow.flipped {
+            transform: rotate(180deg);
+        }
+
+        .gravity-text {
+            font-family: 'Oswald', sans-serif;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .gravity-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Oswald', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            color: #FF5722;
+            text-shadow: 0 0 30px rgba(255, 87, 34, 0.8);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 25;
+        }
+
+        .gravity-warning.active {
+            animation: gravityWarn 1s ease-out;
+        }
+
+        @keyframes gravityWarn {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* Lives */
+        .lives-panel {
+            display: flex;
+            gap: 8px;
+        }
+
+        .life {
+            width: 24px;
+            height: 24px;
+            background: var(--gold);
+            clip-path: polygon(50% 0%, 100% 35%, 80% 100%, 50% 75%, 20% 100%, 0% 35%);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        .life.lost {
+            opacity: 0.2;
+            transform: scale(0.8);
+        }
+
+        /* Sound toggle */
+        .sound-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 24px;
+            z-index: 101;
+        }
+
+        /* Start Screen */
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a1628 0%, #1a2a4a 50%, #0a1628 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .game-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(48px, 12vw, 96px);
+            font-weight: 700;
+            text-transform: uppercase;
+            background: linear-gradient(180deg, var(--white) 0%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .game-subtitle {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(18px, 4vw, 28px);
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 40px;
+        }
+
+        .matchup {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .team-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: 700;
+            font-family: 'Oswald', sans-serif;
+        }
+
+        .team-logo.chiefs {
+            background: linear-gradient(135deg, var(--chiefs-red) 0%, #B8132E 100%);
+            border: 3px solid var(--chiefs-gold);
+            color: var(--white);
+        }
+
+        .team-logo.eagles {
+            background: linear-gradient(135deg, var(--eagles-green) 0%, #003940 100%);
+            border: 3px solid var(--eagles-silver);
+            color: var(--white);
+        }
+
+        .team-name {
+            font-family: 'Oswald', sans-serif;
+            font-size: 18px;
+            text-transform: uppercase;
+            color: var(--white);
+        }
+
+        .vs-text {
+            font-family: 'Oswald', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, var(--gold) 0%, #FFA000 100%);
+            border: none;
+            border-radius: 50px;
+            padding: 20px 60px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 24px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #1a1a1a;
+            cursor: pointer;
+            box-shadow: 0 8px 32px rgba(255, 215, 0, 0.4);
+        }
+
+        .instructions {
+            margin-top: 40px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            max-width: 300px;
+        }
+
+        .instructions strong {
+            color: var(--gold);
+        }
+
+        /* Game Over Screen */
+        #game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        #game-over.active {
+            display: flex;
+        }
+
+        .game-over-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(36px, 10vw, 64px);
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--chiefs-red);
+            margin-bottom: 10px;
+        }
+
+        .final-score-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 8px;
+        }
+
+        .final-score {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(64px, 15vw, 120px);
+            font-weight: 700;
+            background: linear-gradient(180deg, var(--white) 0%, var(--gold) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 30px;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .stat { text-align: center; }
+
+        .stat-value {
+            font-family: 'Oswald', sans-serif;
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--white);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 20px;
+        }
+
+        .retry-btn {
+            background: linear-gradient(135deg, var(--gold) 0%, #FFA000 100%);
+            border: none;
+            border-radius: 50px;
+            padding: 16px 40px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #1a1a1a;
+            cursor: pointer;
+        }
+
+        .share-btn {
+            background: transparent;
+            border: 2px solid var(--white);
+            border-radius: 50px;
+            padding: 16px 40px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--white);
+            cursor: pointer;
+        }
+
+        /* Catch effect */
+        .catch-effect {
+            position: fixed;
+            pointer-events: none;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: catchPulse 0.4s ease-out forwards;
+            z-index: 15;
+        }
+
+        .catch-effect.chiefs {
+            background: radial-gradient(circle, rgba(227, 24, 55, 0.6) 0%, transparent 70%);
+            box-shadow: 0 0 40px var(--chiefs-red);
+        }
+
+        .catch-effect.eagles {
+            background: radial-gradient(circle, rgba(0, 76, 84, 0.6) 0%, transparent 70%);
+            box-shadow: 0 0 40px var(--eagles-green);
+        }
+
+        @keyframes catchPulse {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <button class="sound-toggle" id="sound-toggle">🔊</button>
+    
+    <div id="hud">
+        <div class="score-panel">
+            <div class="score-label">Score</div>
+            <div class="score-value" id="score">0</div>
+        </div>
+        <div class="lives-panel" id="lives">
+            <div class="life"></div>
+            <div class="life"></div>
+            <div class="life"></div>
+        </div>
+    </div>
+
+    <div class="combo-display" id="combo"></div>
+    <div class="gravity-warning" id="gravity-warning">⚡ GRAVITY FLIP ⚡</div>
+    
+    <div class="gravity-indicator" id="gravity-indicator">
+        <span class="gravity-arrow" id="gravity-arrow">⬇️</span>
+        <span class="gravity-text">Gravity</span>
+    </div>
+
+    <div id="start-screen">
+        <h1 class="game-title">Fumble Physics</h1>
+        <p class="game-subtitle">Super Bowl LX Edition</p>
+        
+        <div class="matchup">
+            <div class="team">
+                <div class="team-logo chiefs">KC</div>
+                <span class="team-name">Chiefs</span>
+            </div>
+            <span class="vs-text">VS</span>
+            <div class="team">
+                <div class="team-logo eagles">PHI</div>
+                <span class="team-name">Eagles</span>
+            </div>
+        </div>
+        
+        <button class="start-btn" id="start-btn">Play Ball!</button>
+        
+        <p class="instructions">
+            <strong>Click</strong> to catch fumbled footballs before they escape!<br>
+            ⚠️ Gravity flips every few seconds!
+        </p>
+    </div>
+
+    <div id="game-over">
+        <h2 class="game-over-title">Fumble!</h2>
+        <p class="final-score-label">Final Score</p>
+        <p class="final-score" id="final-score">0</p>
+        <div class="stats-row">
+            <div class="stat">
+                <div class="stat-value" id="catches-stat">0</div>
+                <div class="stat-label">Catches</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="max-combo-stat">0</div>
+                <div class="stat-label">Max Combo</div>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="retry-btn" id="retry-btn">Play Again</button>
+            <button class="share-btn" id="share-btn">Share 📤</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script>
+        // ============================================
+        // FUMBLE PHYSICS - Super Bowl LX Edition
+        // ============================================
+
+        const { Engine, Render, Runner, Bodies, Body, Composite, Events, Vector, Mouse, MouseConstraint } = Matter;
+
+        // ============================================
+        // SOUND SYSTEM
+        // ============================================
+        let audioContext;
+        let soundEnabled = true;
+
+        function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSound(type) {
+            if (!soundEnabled || !audioContext) return;
+            if (audioContext.state === 'suspended') audioContext.resume();
+
+            const now = audioContext.currentTime;
+            
+            switch(type) {
+                case 'catch': playCatchSound(now); break;
+                case 'combo': playComboSound(now); break;
+                case 'miss': playMissSound(now); break;
+                case 'flip': playFlipSound(now); break;
+                case 'gameOver': playGameOverSound(now); break;
+                case 'start': playStartSound(now); break;
+            }
+        }
+
+        function playCatchSound(now) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.exponentialRampToValueAtTime(1320, now + 0.05);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        }
+
+        function playComboSound(now) {
+            [523, 659, 784, 1047].forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.setValueAtTime(freq, now + i * 0.05);
+                osc.type = 'triangle';
+                gain.gain.setValueAtTime(0.2, now + i * 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.2);
+                osc.start(now + i * 0.05);
+                osc.stop(now + i * 0.05 + 0.2);
+            });
+        }
+
+        function playMissSound(now) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.frequency.setValueAtTime(200, now);
+            osc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
+            osc.type = 'sawtooth';
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc.start(now);
+            osc.stop(now + 0.3);
+        }
+
+        function playFlipSound(now) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, now);
+            osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        }
+
+        function playGameOverSound(now) {
+            [392, 349, 330, 262].forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.frequency.setValueAtTime(freq, now + i * 0.15);
+                gain.gain.setValueAtTime(0.25, now + i * 0.15);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.4);
+                osc.start(now + i * 0.15);
+                osc.stop(now + i * 0.15 + 0.4);
+            });
+        }
+
+        function playStartSound(now) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.frequency.setValueAtTime(1200, now);
+            osc.frequency.setValueAtTime(1400, now + 0.1);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+            osc.start(now);
+            osc.stop(now + 0.35);
+        }
+
+        document.getElementById('sound-toggle').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-toggle').textContent = soundEnabled ? '🔊' : '🔇';
+        });
+
+        // ============================================
+        // GAME
+        // ============================================
+        let engine, render, runner, canvas;
+        let gameState = 'start';
+        let score = 0, lives = 3, combo = 0, maxCombo = 0, catches = 0;
+        let gravityFlipped = false;
+        let lastGravityFlip = 0, lastSpawn = 0;
+        let balls = [];
+
+        const W = window.innerWidth;
+        const H = window.innerHeight;
+
+        // Colors
+        const CHIEFS_RED = '#E31837';
+        const CHIEFS_GOLD = '#FFB81C';
+        const EAGLES_GREEN = '#004C54';
+        const EAGLES_SILVER = '#A5ACAF';
+
+        function initEngine() {
+            engine = Engine.create();
+            engine.gravity.y = 0.5;
+            engine.gravity.scale = 0.001;
+
+            render = Render.create({
+                element: document.getElementById('game-container'),
+                engine: engine,
+                options: {
+                    width: W,
+                    height: H,
+                    wireframes: false,
+                    background: '#1a472a'
+                }
+            });
+
+            canvas = render.canvas;
+            canvas.style.cursor = 'pointer';
+
+            // Walls
+            const wallOpts = { isStatic: true, render: { visible: false }, label: 'wall' };
+            Composite.add(engine.world, [
+                Bodies.rectangle(-25, H/2, 50, H*2, wallOpts),
+                Bodies.rectangle(W+25, H/2, 50, H*2, wallOpts)
+            ]);
+
+            // Out of bounds sensors
+            const sensorOpts = { isStatic: true, isSensor: true, render: { visible: false }, label: 'outOfBounds' };
+            Composite.add(engine.world, [
+                Bodies.rectangle(W/2, -100, W*2, 50, sensorOpts),
+                Bodies.rectangle(W/2, H+100, W*2, 50, sensorOpts)
+            ]);
+
+            // Collision detection for out of bounds
+            Events.on(engine, 'collisionStart', (event) => {
+                event.pairs.forEach(pair => {
+                    const a = pair.bodyA, b = pair.bodyB;
+                    if (a.label === 'outOfBounds' && (b.label === 'chiefs' || b.label === 'eagles')) {
+                        handleMissedBall(b);
+                    } else if (b.label === 'outOfBounds' && (a.label === 'chiefs' || a.label === 'eagles')) {
+                        handleMissedBall(a);
+                    }
+                });
+            });
+
+            Render.run(render);
+            runner = Runner.create();
+            Runner.run(runner, engine);
+
+            // Click handler
+            canvas.addEventListener('click', handleClick);
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                handleClick(e.touches[0]);
+            }, { passive: false });
+        }
+
+        function spawnBall() {
+            const isChiefs = Math.random() > 0.5;
+            const x = 100 + Math.random() * (W - 200);
+            const y = gravityFlipped ? H + 40 : -40;
+            
+            const ball = Bodies.circle(x, y, 28, {
+                restitution: 0.5,
+                friction: 0.1,
+                frictionAir: 0.015,
+                label: isChiefs ? 'chiefs' : 'eagles',
+                render: {
+                    fillStyle: isChiefs ? CHIEFS_RED : EAGLES_GREEN,
+                    strokeStyle: isChiefs ? CHIEFS_GOLD : EAGLES_SILVER,
+                    lineWidth: 4
+                }
+            });
+
+            const vx = (Math.random() - 0.5) * 2;
+            const vy = gravityFlipped ? -1 : 1;
+            Body.setVelocity(ball, { x: vx, y: vy });
+            Body.setAngularVelocity(ball, (Math.random() - 0.5) * 0.05);
+
+            balls.push(ball);
+            Composite.add(engine.world, ball);
+        }
+
+        function handleClick(e) {
+            if (gameState !== 'playing') return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const radius = 90;
+
+            let caught = false;
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const ball = balls[i];
+                const dx = ball.position.x - x;
+                const dy = ball.position.y - y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < radius) {
+                    caught = true;
+                    catches++;
+                    combo++;
+                    if (combo > maxCombo) maxCombo = combo;
+
+                    const points = 100 * Math.min(combo, 10);
+                    score += points;
+                    updateScore();
+
+                    if (combo >= 3) playSound('combo');
+                    else playSound('catch');
+
+                    if (combo >= 2) showCombo(combo);
+                    showCatchEffect(ball.position.x, ball.position.y, ball.label);
+
+                    Composite.remove(engine.world, ball);
+                    balls.splice(i, 1);
+                    break;
+                }
+            }
+
+            if (!caught) combo = 0;
+        }
+
+        function handleMissedBall(ball) {
+            const idx = balls.indexOf(ball);
+            if (idx > -1) {
+                balls.splice(idx, 1);
+                Composite.remove(engine.world, ball);
+                lives--;
+                combo = 0;
+                updateLives();
+                playSound('miss');
+                if (lives <= 0) endGame();
+            }
+        }
+
+        function flipGravity() {
+            gravityFlipped = !gravityFlipped;
+            engine.gravity.y = gravityFlipped ? -0.5 : 0.5;
+            document.getElementById('gravity-arrow').classList.toggle('flipped', gravityFlipped);
+            playSound('flip');
+            
+            const warning = document.getElementById('gravity-warning');
+            warning.classList.remove('active');
+            void warning.offsetWidth;
+            warning.classList.add('active');
+        }
+
+        function showCatchEffect(x, y, team) {
+            const el = document.createElement('div');
+            el.className = 'catch-effect ' + team;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 400);
+        }
+
+        function showCombo(n) {
+            const el = document.getElementById('combo');
+            el.textContent = n + 'x COMBO!';
+            el.classList.remove('active');
+            void el.offsetWidth;
+            el.classList.add('active');
+            setTimeout(() => el.classList.remove('active'), 800);
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = score.toLocaleString();
+        }
+
+        function updateLives() {
+            document.querySelectorAll('#lives .life').forEach((el, i) => {
+                el.classList.toggle('lost', i >= lives);
+            });
+        }
+
+        function gameLoop(ts) {
+            if (gameState !== 'playing') return;
+
+            const difficulty = 1 + score / 10000;
+            const spawnInterval = Math.max(1500, 3000 - difficulty * 200);
+            const flipInterval = Math.max(8000, 12000 - difficulty * 500);
+
+            if (ts - lastSpawn > spawnInterval) {
+                spawnBall();
+                lastSpawn = ts;
+            }
+
+            if (ts - lastGravityFlip > flipInterval) {
+                flipGravity();
+                lastGravityFlip = ts;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            if (!audioContext) initAudio();
+            playSound('start');
+
+            gameState = 'playing';
+            score = 0; lives = 3; combo = 0; maxCombo = 0; catches = 0;
+            gravityFlipped = false;
+            lastSpawn = lastGravityFlip = performance.now();
+
+            engine.gravity.y = 0.5;
+            document.getElementById('gravity-arrow').classList.remove('flipped');
+
+            balls.forEach(b => Composite.remove(engine.world, b));
+            balls = [];
+
+            updateScore();
+            updateLives();
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-over').classList.remove('active');
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('gravity-indicator').style.display = 'flex';
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameState = 'gameover';
+            playSound('gameOver');
+            document.getElementById('final-score').textContent = score.toLocaleString();
+            document.getElementById('catches-stat').textContent = catches;
+            document.getElementById('max-combo-stat').textContent = maxCombo + 'x';
+            document.getElementById('game-over').classList.add('active');
+        }
+
+        function shareScore() {
+            const text = `🏈 I scored ${score.toLocaleString()} in Fumble Physics!\n🔥 ${catches} catches, ${maxCombo}x max combo\n\nCan you survive the Super Bowl fumble chaos?`;
+            if (navigator.share) {
+                navigator.share({ title: 'Fumble Physics', text, url: location.href });
+            } else {
+                navigator.clipboard.writeText(text + '\n' + location.href).then(() => alert('Copied!'));
+            }
+        }
+
+        // Init
+        initEngine();
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('retry-btn').addEventListener('click', startGame);
+        document.getElementById('share-btn').addEventListener('click', shareScore);
+
+        // Draw laces
+        Events.on(render, 'afterRender', () => {
+            const ctx = render.context;
+            balls.forEach(ball => {
+                ctx.save();
+                ctx.translate(ball.position.x, ball.position.y);
+                ctx.rotate(ball.angle);
+                ctx.strokeStyle = '#FFF';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-10, -4);
+                ctx.lineTo(10, -4);
+                ctx.stroke();
+                for (let i = -8; i <= 8; i += 4) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, -8);
+                    ctx.lineTo(i, 0);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            });
+        });
+    </script>
+</body>
+</html>
