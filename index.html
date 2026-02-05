@@ -315,6 +315,42 @@
             color: var(--gold);
         }
 
+        /* Author promo */
+        .promo-link {
+            margin-top: 30px;
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s, transform 0.2s;
+        }
+
+        .promo-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .promo-text {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .promo-title {
+            font-family: 'Oswald', sans-serif;
+            font-size: 14px;
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .promo-emoji {
+            font-size: 20px;
+        }
+
         /* Game Over Screen */
         #game-over {
             position: fixed;
@@ -512,6 +548,13 @@
             <button class="retry-btn" id="retry-btn">Play Again</button>
             <button class="share-btn" id="share-btn">Share 📤</button>
         </div>
+        <a href="https://www.amazon.com/author/edwardbrooks" target="_blank" rel="noopener" class="promo-link">
+            <span class="promo-emoji">📚</span>
+            <span>
+                <span class="promo-text">Like epic fantasy?</span><br>
+                <span class="promo-title">Imani: The Warrior Nun →</span>
+            </span>
+        </a>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
